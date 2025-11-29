@@ -1,0 +1,12 @@
+*~
+*.un~
+*.swp
+*.bak
+
+*.o
+
+*.exe
+
+*.log
+
+.vscode/
