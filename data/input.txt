@@ -1,0 +1,10 @@
+# 1. Periodic Task (Low Priority)
+#    Released at 0, Exec 10, Period 20
+P 0 10 20 20
+
+# 2. Aperiodic Task (Target for the Server)
+#    Arrives at Time 2, Exec 1.
+#    Note: Since our Server Period is 5 (Hardcoded in Scheduler.cpp), 
+#    and Poller checks at T=0, it will miss this arrival!
+#    It should wait until T=5 to run.
+A 2 1 (Poller)
