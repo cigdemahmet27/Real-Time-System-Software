@@ -18,6 +18,13 @@ int main() {
         return 1;
     }
 
+    std::cout << "Select Scheduling Algorithm:\n";
+    std::cout << "1. Rate Monotonic (RM)\n";
+    std::cout << "2. Deadline Monotonic (DM)\n";
+    std::cout << "3. Earliest Deadline First (EDF)\n";
+    std::cout << "4. Least Slack Time (LST)\n";
+    std::cout << "Enter your choice: ";
+
     // ... (Menu Selection Code same as before) ...
     int choice;
     // Assume user input code here for brevity

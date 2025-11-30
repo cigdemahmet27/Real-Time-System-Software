@@ -1,10 +1,22 @@
-# 1. Periodic Task (Low Priority)
-#    Released at 0, Exec 10, Period 20
-P 0 10 20 20
+# --- SETUP ---
+# Server (Implicit): Capacity=2, Period=5.
+# Server Priority: High (Period 5 < Period 10)
 
-# 2. Aperiodic Task (Target for the Server)
-#    Arrives at Time 2, Exec 1.
-#    Note: Since our Server Period is 5 (Hardcoded in Scheduler.cpp), 
-#    and Poller checks at T=0, it will miss this arrival!
-#    It should wait until T=5 to run.
-A 2 1 (Poller)
+# --- PERIODIC TASK ---
+# Task 1: Period 10, Execution 5.
+# Runs from 0-5 normally.
+P 0 5 10 10
+
+# --- APERIODIC TASK ---
+# Arrives at T=2.
+#
+# WHY THIS IS A GOOD TEST:
+# 1. At T=0, Server checks queue -> Empty. 
+#    - If Poller: It would burn budget and sleep.
+#    - If Deferrable: It PRESERVES budget.
+#
+# 2. At T=2, Task arrives.
+#    - Periodic Task 1 is currently running.
+#    - Deferrable Server says "Wait! I still have budget!"
+#    - Server INTERRUPTS (Preempts) Task 1 immediately.
+A 2 2 (Deferrable)
