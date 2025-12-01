@@ -2,11 +2,13 @@
 #include <fstream>
 #include <sstream>
 #include <iostream>
+#include <cmath> // for round
+
+// --- CONFIG ---
+const int SCALE_FACTOR = 10; // 1 unit = 10 ticks (0.1 resolution)
 
 FileReader::ParseResult FileReader::readInputFile(const std::string& filename) {
     ParseResult result;
-    
-    // Default Policy: If no tags are found, we assume Background
     result.serverPolicy = "Background"; 
     
     std::ifstream file(filename);
@@ -31,49 +33,74 @@ FileReader::ParseResult FileReader::readInputFile(const std::string& filename) {
         else if (typeChar == 'A') type = TaskType::Aperiodic;
         else continue;
 
-        std::vector<int> numbers;
-        int num;
-        while (ss >> num) numbers.push_back(num);
+        std::vector<double> rawNumbers;
+        double num;
+        while (ss >> num) rawNumbers.push_back(num);
         
-        // --- THE GLOBAL POLICY LOGIC ---
-        // We check EVERY Aperiodic line for a policy tag.
-        // Since we process the file top-to-bottom, the LAST tag found 
-        // will overwrite any previous ones.
+        // Check Policy Tags for Aperiodic tasks
         if (type == TaskType::Aperiodic) {
             ss.clear();
             std::string remaining;
-            std::getline(ss, remaining); // Read text after numbers like "(Poller)"
-            
-            if (remaining.find("Poller") != std::string::npos) {
-                result.serverPolicy = "Poller";
-            } 
-            else if (remaining.find("Deferrable") != std::string::npos) {
-                result.serverPolicy = "Deferrable";
+            std::getline(ss, remaining);
+            if (remaining.find("Poller") != std::string::npos) result.serverPolicy = "Poller";
+            else if (remaining.find("Deferrable") != std::string::npos) result.serverPolicy = "Deferrable";
+        }
+
+        // Default vars
+        double r_d = 0, e_d = 0, p_d = 0, d_d = 0;
+
+        // --- MAPPING LOGIC START ---
+        
+        if (rawNumbers.size() == 2) {
+            // Case: e, p (Assume r=0, d=p)
+            r_d = 0; 
+            e_d = rawNumbers[0]; 
+            p_d = rawNumbers[1]; 
+            d_d = rawNumbers[1];
+        } 
+        else if (rawNumbers.size() == 3) {
+            // --- NEW LOGIC HERE ---
+            if (type == TaskType::Sporadic) {
+                // Sporadic (D) with 3 numbers: e, p, d (Assume r=0)
+                r_d = 0;
+                e_d = rawNumbers[0];
+                p_d = rawNumbers[1];
+                d_d = rawNumbers[2];
+            } else {
+                // Periodic (P) with 3 numbers: r, e, p (Assume d=p)
+                r_d = rawNumbers[0];
+                e_d = rawNumbers[1];
+                p_d = rawNumbers[2];
+                d_d = rawNumbers[2];
             }
-            // Note: If a line has NO tag, we do NOT reset it to Background. 
-            // We keep the last known policy (or the future policy if it appears later).
+        } 
+        else if (rawNumbers.size() >= 4) {
+            // Case: r, e, p, d
+            r_d = rawNumbers[0]; 
+            e_d = rawNumbers[1]; 
+            p_d = rawNumbers[2]; 
+            d_d = rawNumbers[3];
         }
 
-        // Parsing r, e, p, d logic
-        int r = 0, e = 0, p = 0, d = 0;
-        if (numbers.size() == 2) { r = 0; e = numbers[0]; p = numbers[1]; d = numbers[1]; }
-        else if (numbers.size() == 3) { r = numbers[0]; e = numbers[1]; p = numbers[2]; d = numbers[2]; }
-        else if (numbers.size() >= 4) { r = numbers[0]; e = numbers[1]; p = numbers[2]; d = numbers[3]; }
-
-        // Special case for Aperiodic format "A r e"
-        if (type == TaskType::Aperiodic && numbers.size() == 2) {
-            r = numbers[0]; e = numbers[1]; p = 0; d = 0;
+        // Special override for Aperiodic (A) if it has 2 numbers: r, e
+        if (type == TaskType::Aperiodic && rawNumbers.size() == 2) {
+            r_d = rawNumbers[0]; 
+            e_d = rawNumbers[1]; 
+            p_d = 0; 
+            d_d = 0;
         }
+
+        // SCALE AND CAST TO INT
+        int r = (int)std::round(r_d * SCALE_FACTOR);
+        int e = (int)std::round(e_d * SCALE_FACTOR);
+        int p = (int)std::round(p_d * SCALE_FACTOR);
+        int d = (int)std::round(d_d * SCALE_FACTOR);
 
         Task newTask(taskIdCounter++, type, r, e, p, d);
         
         if (type == TaskType::Aperiodic) result.aperiodicTasks.push_back(newTask);
         else result.periodicTasks.push_back(newTask);
     }
-    
     file.close();
-    
-    // At this point, result.serverPolicy holds the value from the LAST tag found.
-    // This policy will apply to ALL tasks in result.aperiodicTasks.
     return result;
 }
