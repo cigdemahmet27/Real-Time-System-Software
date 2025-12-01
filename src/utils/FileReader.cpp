@@ -27,10 +27,21 @@ FileReader::ParseResult FileReader::readInputFile(const std::string& filename) {
         char typeChar;
         ss >> typeChar;
 
+        // D is also Periodic, just with explicit deadline
         TaskType type = TaskType::Periodic;
-        if (typeChar == 'P') type = TaskType::Periodic;
-        else if (typeChar == 'D') type = TaskType::Sporadic;
-        else if (typeChar == 'A') type = TaskType::Aperiodic;
+        bool hasExplicitDeadline = false;
+        
+        if (typeChar == 'P') {
+            type = TaskType::Periodic;
+            hasExplicitDeadline = false;
+        }
+        else if (typeChar == 'D') {
+            type = TaskType::Periodic;  // D is also periodic!
+            hasExplicitDeadline = true;
+        }
+        else if (typeChar == 'A') {
+            type = TaskType::Aperiodic;
+        }
         else continue;
 
         std::vector<double> rawNumbers;
@@ -49,45 +60,45 @@ FileReader::ParseResult FileReader::readInputFile(const std::string& filename) {
         // Default vars
         double r_d = 0, e_d = 0, p_d = 0, d_d = 0;
 
-        // --- MAPPING LOGIC START ---
+        // --- MAPPING LOGIC ---
         
         if (rawNumbers.size() == 2) {
-            // Case: e, p (Assume r=0, d=p)
-            r_d = 0; 
-            e_d = rawNumbers[0]; 
-            p_d = rawNumbers[1]; 
-            d_d = rawNumbers[1];
+            // P e p  or  A r e
+            if (type == TaskType::Aperiodic) {
+                // A r e -> Aperiodic: release, exec
+                r_d = rawNumbers[0]; 
+                e_d = rawNumbers[1]; 
+                p_d = 0; 
+                d_d = 0;
+            } else {
+                // P e p -> Periodic: exec, period (r=0, d=p)
+                r_d = 0; 
+                e_d = rawNumbers[0]; 
+                p_d = rawNumbers[1]; 
+                d_d = rawNumbers[1]; // deadline = period
+            }
         } 
         else if (rawNumbers.size() == 3) {
-            // --- NEW LOGIC HERE ---
-            if (type == TaskType::Sporadic) {
-                // Sporadic (D) with 3 numbers: e, p, d (Assume r=0)
+            if (hasExplicitDeadline) {
+                // D e p d -> Periodic with deadline: exec, period, deadline (r=0)
                 r_d = 0;
                 e_d = rawNumbers[0];
                 p_d = rawNumbers[1];
-                d_d = rawNumbers[2];
+                d_d = rawNumbers[2]; // explicit deadline
             } else {
-                // Periodic (P) with 3 numbers: r, e, p (Assume d=p)
+                // P r e p -> Periodic: release, exec, period (d=p)
                 r_d = rawNumbers[0];
                 e_d = rawNumbers[1];
                 p_d = rawNumbers[2];
-                d_d = rawNumbers[2];
+                d_d = rawNumbers[2]; // deadline = period
             }
         } 
         else if (rawNumbers.size() >= 4) {
-            // Case: r, e, p, d
+            // P r e p d or D r e p d -> release, exec, period, deadline
             r_d = rawNumbers[0]; 
             e_d = rawNumbers[1]; 
             p_d = rawNumbers[2]; 
             d_d = rawNumbers[3];
-        }
-
-        // Special override for Aperiodic (A) if it has 2 numbers: r, e
-        if (type == TaskType::Aperiodic && rawNumbers.size() == 2) {
-            r_d = rawNumbers[0]; 
-            e_d = rawNumbers[1]; 
-            p_d = 0; 
-            d_d = 0;
         }
 
         // SCALE AND CAST TO INT
